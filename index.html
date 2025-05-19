@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Passagem de Plantão Farmacêutico</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background-color: #004080;
+      color: white;
+      padding: 10px 20px;
+    }
+    h1 {
+      margin: 0;
+    }
+    nav {
+      background-color: #f0f0f0;
+      padding: 10px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    nav a {
+      margin-right: 10px;
+      text-decoration: none;
+      color: #004080;
+      font-weight: bold;
+      display: inline-block;
+      padding: 4px 8px;
+      border: 1px solid #004080;
+      border-radius: 4px;
+      background-color: white;
+      cursor: pointer;
+    }
+    nav a:hover {
+      background-color: #cce0ff;
+    }
+    .content {
+      display: none;
+      padding: 20px;
+    }
+    .active {
+      display: block;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      vertical-align: middle;
+    }
+    th {
+      background-color: #e0e0e0;
+    }
+    td[contenteditable="true"] {
+      background-color: #fff8dc;
+    }
+    select, input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .controls {
+      position: sticky;
+      top: 0;
+      background-color: white;
+      z-index: 10;
+      padding: 10px 0;
+      margin-bottom: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn-add {
+      padding: 6px 12px;
+      background-color: #007acc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-add:hover {
+      background-color: #005fa3;
+    }
+    label {
+      font-weight: bold;
+      user-select: none;
+    }
+    select[multiple] {
+      height: 100px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Passagem de Plantão Farmacêutico</h1>
+</header>
+
+<nav id="menu">
+  <!-- Abas geradas dinamicamente -->
+</nav>
+
+<div id="conteudo">
+  <!-- Conteúdos gerados dinamicamente -->
+</div>
+
+<script>
+  const andares = [
+    "12A", "11A", "10A", "9A", "8A", "7A", "6A", "5A", "4A", "3L", "2TX",
+    "13D", "12D", "11D", "10D", "9D", "8D", "4D", "3D", "3B/C", "2B", "5B/C",
+    "I1 A1", "UPA(i4)", "1SS", "2SS", "HEMO", "NEO(7D)", "2E", "4E", "3W", "2W", "DAY CLINIC"
+  ];
+  const situacoes = [
+    "CONCLUIDO", "PENDENTE", "VALIDAR", "VALIDADO", "MONITORAR", "TRANSFERIDO", "B.L. CIENTE"
+  ];
+
+  // Cria as abas e seus conteúdos
+  function gerarAbas() {
+    const menu = document.getElementById("menu");
+    const conteudo = document.getElementById("conteudo");
+
+    andares.forEach(andar => {
+      // Criar link da aba
+      const link = document.createElement("a");
+      link.textContent = andar;
+      link.href = "#";
+      link.onclick = (e) => {
+        e.preventDefault();
+        mostrarAba(andar);
+      };
+      menu.appendChild(link);
+
+      // Criar div conteúdo da aba
+      const div = document.createElement("div");
+      div.id = andar;
+      div.className = "content";
+
+      // Controles: filtro e botão adicionar linha
+      const controls = document.createElement("div");
+      controls.className = "controls";
+      controls.innerHTML = `
+        <label>Filtrar Situação:
+          <select onchange="filtrarTabela('${andar}', this.value)">
+            <option value="">Todas</option>
+            ${situacoes.map(s => `<option value="${s}">${s}</option>`).join("")}
+          </select>
+        </label>
+        <button class="btn-add" onclick="adicionarLinha('${andar}')">Adicionar Linha</button>
+      `;
+
+      // Tabela da aba
+      const tabela = document.createElement("table");
+      tabela.id = `tabela-${andar}`;
+      tabela.innerHTML = `
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Unidade</th>
+            <th>Situação</th>
+            <th>Descrição</th>
+            <th>Modificado por</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+
+      div.appendChild(controls);
+      div.appendChild(tabela);
+      conteudo.appendChild(div);
+    });
+
+    // Aba Resumo Geral
+    const linkResumo = document.createElement("a");
+    linkResumo.textContent = "Resumo Geral";
+    linkResumo.href = "#";
+    linkResumo.onclick = (e) => {
+      e.preventDefault();
+      mostrarAba("resumo");
+    };
+    menu.appendChild(linkResumo);
+
+    const divResumo = document.createElement("div");
+    divResumo.id = "resumo";
+    divResumo.className = "content";
+    divResumo.innerHTML = `
+      <div class="controls">
+        <label>Filtrar Andares (selecione múltiplos):
+          <select id="filtroAndaresResumo" multiple onchange="filtrarResumo()">
+            ${andares.map(a => `<option value="${a}">${a}</option>`).join("")}
+          </select>
+        </label>
+        <label>Filtrar Situação:
+          <select id="filtroSituacaoResumo" onchange="filtrarResumo()">
+            <option value="">Todas</option>
+            ${situacoes.map(s => `<option value="${s}">${s}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <table id="tabela-resumo">
+        <thead>
+          <tr>
+            <th>Andar</th>
+            <th>Data</th>
+            <th>Unidade</th>
+            <th>Situação</th>
+            <th>Descrição</th>
+            <th>Modificado por</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    `;
+    conteudo.appendChild(divResumo);
+  }
+
+  // Mostra a aba selecionada, esconde as outras
+  function mostrarAba(abaId) {
+    document.querySelectorAll(".content").forEach(div => {
+      div.classList.remove("active");
+    });
+    document.querySelectorAll("nav a").forEach(a => {
+      a.classList.remove("selected");
+    });
+
+    const divAtiva = document.getElementById(abaId);
+    if (divAtiva) divAtiva.classList.add("active");
+
+    // Marca o link como selecionado
+    const menuLinks = [...document.querySelectorAll("nav a")];
+    const linkAtivo = menuLinks.find(link => link.textContent === abaId || (abaId === "resumo" && link.textContent === "Resumo Geral"));
+    if (linkAtivo) linkAtivo.classList.add("selected");
+  }
+
+  // Adiciona nova linha na tabela do andar
+  function adicionarLinha(andar) {
+    const tabela = document.getElementById(`tabela-${andar}`).querySelector("tbody");
+    const dataAtual = new Date().toLocaleString('pt-BR', { hour12: false });
+    const linha = document.createElement("tr");
+
+    linha.innerHTML = `
+      <td contenteditable="false">${dataAtual}</td>
+      <td>
+        <select class="unidade" onchange="atualizarUnidade('${andar}', this)">
+          <option value="${andar}" selected>${andar}</option>
+        </select>
+      </td>
+      <td>
+        <select class="situacao">
+          ${situacoes.map(s => `<option value="${s}">${s}</option>`).join("")}
+        </select>
+      </td>
+      <td contenteditable="true"></td>
+      <td>${getLoginUsuario()}</td>
+    `;
+    tabela.appendChild(linha);
+    popularResumo();
+  }
+
+  // Garante que o select de unidade fique sempre com o andar correto
+  function atualizarUnidade(andar, select) {
+    select.value = andar;
+  }
+
+  // Retorna o usuário (simulação)
+  function getLoginUsuario() {
+    return 'Usuario_' + Math.floor(Math.random() * 10000);
+  }
+
+  // Filtra tabela do andar pela situação
+  function filtrarTabela(andar, situacao) {
+    const tabela = document.getElementById(`tabela-${andar}`);
+    const linhas = tabela.querySelectorAll("tbody tr");
+
+    linhas.forEach(linha => {
+      const situacaoCelula = linha.querySelector("td:nth-child(3)").textContent;
+      if (situacao && situacaoCelula !== situacao) {
+        linha.style.display = "none";
+      } else {
+        linha.style.display = "";
+      }
+    });
+  }
+
+  // Popula o Resumo Geral com dados das tabelas
+  function popularResumo() {
+  const resumoTabela = document.getElementById("tabela-resumo").querySelector("tbody");
+  resumoTabela.innerHTML = ""; // Limpa antes de repopular
+
+  andares.forEach(andar => {
+    const tabelaAndar = document.getElementById(`tabela-${andar}`);
+    const linhas = tabelaAndar.querySelectorAll("tbody tr");
+
+    linhas.forEach(linha => {
+      const data = linha.querySelector("td:nth-child(1)").textContent;
+      const unidade = linha.querySelector("td:nth-child(2)").textContent;
+
+      // Aqui a correção para pegar o valor selecionado do select de situação
+      const situacaoSelect = linha.querySelector("td:nth-child(3) select");
+      const situacao = situacaoSelect ? situacaoSelect.value : linha.querySelector("td:nth-child(3)").textContent;
+
+      const descricao = linha.querySelector("td:nth-child(4)").textContent;
+      const modificadoPor = linha.querySelector("td:nth-child(5)").textContent;
+
+      const novaLinha = document.createElement("tr");
+      novaLinha.innerHTML = `
+        <td>${andar}</td>
+        <td>${data}</td>
+        <td>${unidade}</td>
+        <td>${situacao}</td>
+        <td>${descricao}</td>
+        <td>${modificadoPor}</td>
+      `;
+      resumoTabela.appendChild(novaLinha);
+    });
+  });
+}
+
+  // Filtra o resumo geral por andares (multi-seleção) e situação
+  function filtrarResumo() {
+    const selectAndares = document.getElementById("filtroAndaresResumo");
+    const situacaoFiltro = document.getElementById("filtroSituacaoResumo").value;
+    const selecionados = [...selectAndares.selectedOptions].map(opt => opt.value);
+
+    const linhasResumo = document.getElementById("tabela-resumo").querySelectorAll("tbody tr");
+
+    linhasResumo.forEach(linha => {
+      const andarCelula = linha.querySelector("td:nth-child(1)").textContent;
+      const situacaoCelula = linha.querySelector("td:nth-child(4)").textContent;
+
+      // Filtra andar: se houver seleção, exibe só os selecionados, senão tudo
+      const passarFiltroAndar = selecionados.length === 0 || selecionados.includes(andarCelula);
+
+      // Filtra situação
+      const passarFiltroSituacao = situacaoFiltro === "" || situacaoCelula === situacaoFiltro;
+
+      if (passarFiltroAndar && passarFiltroSituacao) {
+        linha.style.display = "";
+      } else {
+        linha.style.display = "none";
+      }
+    });
+  }
+
+  // Inicialização da página
+  window.onload = () => {
+    gerarAbas();
+    mostrarAba("12A");
+// abre a primeira aba
+};
+</script>
+
+</body> </html>
